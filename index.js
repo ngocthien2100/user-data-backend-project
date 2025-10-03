@@ -13,6 +13,16 @@ app.get('/', (req, res) => {
     //Trả về phản hồi JSON
     res.json({ message: 'Chào mừng đến với API Dữ liệu người dùng' });
 });
+// API GET để kiểm tra trạng thái hoạt động của Server
+app.get('/api/v1/status', (req, res) => {
+    // Trả về một phản hồi JSON chứa thông tin trạng thái
+    res.json({ 
+        service: "User Data API", 
+        version: "1.0", 
+        health: "Good",
+        timestamp: new Date().toISOString() // Thêm thời gian hiện tại
+    });
+});
 
 //4. Lắng nghe các yêu cầu tại cổng định nghĩa
 app.listen(PORT, () => {
