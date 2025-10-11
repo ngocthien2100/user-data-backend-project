@@ -24,6 +24,21 @@ app.get('/api/v1/status', (req, res) => {
     });
 });
 
+// 1. IMPORT router
+const userRoutes = require('./routes/userRoutes.js');
+
+// 2. Middleware bắt buộc để đọc JSON
+app.use(express.json());
+
+// 3. Gắn route chính
+app.use('/api/v1/users', userRoutes);
+
+// 4. API kiểm tra server
+app.get('/', (req, res) => {
+  res.status(200).json({ message: 'Server is running correctly ✅' });
+});
+
+
 //4. Lắng nghe các yêu cầu tại cổng định nghĩa
 app.listen(PORT, () => {
     console.log(`✅ Server đang chạy tại http://localhost:${PORT}`);
