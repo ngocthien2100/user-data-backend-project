@@ -1,39 +1,50 @@
+// models/User.js
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-
-const profileSchema = new mongoose.Schema({
-  fullName: String,
-  phone: String,
-  avatar: String
-}, { _id: false });
 
 const userSchema = new mongoose.Schema({
-  username: { type: String, required: true, unique: true, trim: true },
-  email:    { type: String, required: true, unique: true, lowercase: true, trim: true },
-  passwordHash: { type: String, required: true },
-  profile: profileSchema,
+  username: {
+    type: String,
+    required: [true, 'Tên đăng nhập không được để trống.'],
+    unique: true,
+    trim: true,
+    minlength: [3, 'Tên đăng nhập phải có ít nhất 3 ký tự.'],
+    maxlength: [30, 'Tên đăng nhập không được quá 30 ký tự.']
+    
+  },
+  passwordHash: {
+  type: String,
+  required: [true, 'Mật khẩu là bắt buộc (passwordHash).'],
+  minlength: [6, 'Mật khẩu phải có ít nhất 6 ký tự.'],
+  trim: true
+  },
 
-  // References
-  orders:    [{ type: mongoose.Schema.Types.ObjectId, ref: 'Order' }],
-  reviews:   [{ type: mongoose.Schema.Types.ObjectId, ref: 'Review' }],
-  wishlist:  { type: mongoose.Schema.Types.ObjectId, ref: 'Wishlist' },  // 1-1
-  cart:      { type: mongoose.Schema.Types.ObjectId, ref: 'Cart' }       // 1-1
+  profile: {
+  fullName: { type: String, trim: true, maxlength: 80 }, // tùy chọn cho bước UPDATE trong lab
+  },
+
+  email: {
+    type: String,
+    required: [true, 'Email không được để trống.'],
+    unique: true,
+    lowercase: true,
+    trim: true,
+    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,})+$/, 'Vui lòng nhập email hợp lệ.']
+  },
+
+  age: {
+    type: Number,
+    min: [18, 'Bạn phải đủ 18 tuổi.'],
+    max: [120, 'Tuổi không hợp lệ.']
+  },
+  
+  role: {
+    type: String,
+    enum: {
+      values: ['user', 'admin', 'moderator'],
+      message: 'Vai trò "{VALUE}" không được hỗ trợ.'
+    },
+    default: 'user'
+  }
 }, { timestamps: true });
-
-// virtual: không trả hash ra API
-userSchema.methods.toJSONSafe = function () {
-  const obj = this.toObject();
-  delete obj.passwordHash;
-  return obj;
-};
-
-userSchema.methods.setPassword = async function (plain) {
-  const salt = await bcrypt.genSalt(10);
-  this.passwordHash = await bcrypt.hash(plain, salt);
-};
-
-userSchema.methods.comparePassword = async function (plain) {
-  return bcrypt.compare(plain, this.passwordHash);
-};
 
 module.exports = mongoose.model('User', userSchema);

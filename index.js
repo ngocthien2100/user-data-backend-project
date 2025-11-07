@@ -19,7 +19,12 @@ connectDB();
 
 // Routes
 const userRoutes = require('./routes/userRoutes.js');
+const categoryRoutes = require('./routes/categoryRoutes');  // <-- THÊM DÒNG NÀY
+const productRoutes  = require('./routes/productRoutes');   // <-- THÊM DÒNG NÀY
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/categories', categoryRoutes);  // <-- THÊM DÒNG NÀY
+app.use('/api/v1/products',  productRoutes);    // <-- THÊM DÒNG NÀY
+
 
 // Health check (gộp một route chính)
 app.get('/', (req, res) => {
@@ -32,7 +37,7 @@ app.get('/', (req, res) => {
   });
 });
 
-// 404 handler
+// 404
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found', path: req.originalUrl });
 });
