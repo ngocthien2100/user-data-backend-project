@@ -1,6 +1,8 @@
 // models/User.js
 const mongoose = require('mongoose');
 
+const bcrypt = require('bcryptjs');
+
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -9,17 +11,31 @@ const userSchema = new mongoose.Schema({
     trim: true,
     minlength: [3, 'Tên đăng nhập phải có ít nhất 3 ký tự.'],
     maxlength: [30, 'Tên đăng nhập không được quá 30 ký tự.']
-    
   },
-  passwordHash: {
-  type: String,
-  required: [true, 'Mật khẩu là bắt buộc (passwordHash).'],
-  minlength: [6, 'Mật khẩu phải có ít nhất 6 ký tự.'],
-  trim: true
+  // passwordHash: {
+  // type: String,
+  // required: [true, 'Mật khẩu là bắt buộc (passwordHash).'],
+  // minlength: [6, 'Mật khẩu phải có ít nhất 6 ký tự.'],
+  // trim: true
+  // },
+  password:{
+    type: String,
+    required: [true, 'Mật khẩu là bắt buộc.'],
+    minlength: [6, 'Mật khẩu phải có ít nhất 6 ký tự.'],
+    select: false
   },
 
   profile: {
-  fullName: { type: String, trim: true, maxlength: 80 }, // tùy chọn cho bước UPDATE trong lab
+    fullName: { 
+      type: String,
+      default: '', 
+      trim: true, 
+    }, // tùy chọn cho bước UPDATE trong lab
+    phone:{
+      type: String,
+      default: '',
+      trim: true
+    },
   },
 
   email: {
@@ -44,7 +60,39 @@ const userSchema = new mongoose.Schema({
       message: 'Vai trò "{VALUE}" không được hỗ trợ.'
     },
     default: 'user'
-  }
+  },
+  cart:{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Cart'
+  },
+  orders:[
+    {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Order'
+    }
+  ],
+  wishlist:{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Wishlist'
+  },
 }, { timestamps: true });
 
+
+userSchema.pre('save', async function (next) {
+
+  if (!this.isModified('password')) {
+    return next();
+  }
+  
+  try {
+
+    const salt = await bcrypt.genSalt(10);
+
+    this.password = await bcrypt.hash(this.password, salt);
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 module.exports = mongoose.model('User', userSchema);

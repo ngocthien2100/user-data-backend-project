@@ -50,15 +50,25 @@ router.get('/', async (req, res, next) => {
 
 // CREATE     -> POST /api/v1/users
 // BẮT BUỘC: username, email, passwordHash (theo lab)
+// CREATE  -> POST /api/v1/users
 router.post('/', async (req, res, next) => {
   try {
-    const { username, email, passwordHash, age, role, profile } = req.body;
-    if (!username || !email || !passwordHash) {
-      return res.status(400).json({ message: 'username, email, passwordHash là bắt buộc' });
+    const { username, email, password, age, role, profile } = req.body;
+
+    // ✅ yêu cầu đúng với model mới: password thay cho passwordHash
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: 'username, email, password là bắt buộc' });
     }
-    const user = await User.create({ username, email, passwordHash, age, role, profile });
-    res.status(201).json({ message: 'Created', data: user });
-  } catch (err) { sendMongooseError(err, res, next); }
+
+    // create -> trigger pre('save') => tự hash password
+    const user = await User.create({ username, email, password, age, role, profile });
+
+    // không trả password về client
+    const { password: _pw, ...safe } = user.toObject();
+    res.status(201).json({ message: 'Created', data: safe });
+  } catch (err) {
+    sendMongooseError(err, res, next);
+  }
 });
 
 // READ ONE   -> GET /api/v1/users/:id
@@ -75,19 +85,43 @@ router.get('/:id', async (req, res, next) => {
 
 // UPDATE     -> PUT /api/v1/users/:id
 // Lab gợi ý ví dụ đổi profile.fullName
+// UPDATE  -> PUT /api/v1/users/:id
 router.put('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
     if (!isValidObjectId(id)) return res.status(400).json({ message: 'id không hợp lệ' });
 
-    const allowed = ['username', 'email', 'passwordHash', 'age', 'role', 'profile'];
+    const { password, ...rest } = req.body;
+
+    // Nếu có password -> phải save() để trigger pre('save')
+    if (password !== undefined) {
+      const doc = await User.findById(id).select('+password'); // chọn password vì select:false
+      if (!doc) return res.status(404).json({ message: `Không tìm thấy user id ${id}` });
+
+      // cập nhật các field khác
+      Object.entries(rest).forEach(([k, v]) => { doc.set(k, v); });
+
+      // đặt mật khẩu mới -> pre('save') sẽ tự hash
+      doc.password = password;
+
+      await doc.save(); // chạy validators + pre('save')
+
+      const obj = doc.toObject();
+      delete obj.password;
+      return res.status(200).json({ message: 'Updated', data: obj });
+    }
+
+    // Không đổi password -> có thể dùng findByIdAndUpdate
+    const allowed = ['username','email','age','role','profile','cart','orders','wishlist'];
     const update = {};
-    for (const k of allowed) if (req.body[k] !== undefined) update[k] = req.body[k];
+    allowed.forEach(k => { if (req.body[k] !== undefined) update[k] = req.body[k]; });
 
     const user = await User.findByIdAndUpdate(id, update, { new: true, runValidators: true }).lean();
     if (!user) return res.status(404).json({ message: `Không tìm thấy user id ${id}` });
-    res.status(200).json({ message: 'Updated', data: user });
-  } catch (err) { sendMongooseError(err, res, next); }
+    return res.status(200).json({ message: 'Updated', data: user });
+  } catch (err) {
+    sendMongooseError(err, res, next);
+  }
 });
 
 // DELETE     -> DELETE /api/v1/users/:id
