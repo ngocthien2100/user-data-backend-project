@@ -51,25 +51,25 @@ router.get('/', async (req, res, next) => {
 // CREATE     -> POST /api/v1/users
 // BẮT BUỘC: username, email, passwordHash (theo lab)
 // CREATE  -> POST /api/v1/users
-router.post('/', async (req, res, next) => {
-  try {
-    const { username, email, password, age, role, profile } = req.body;
+// router.post('/', async (req, res, next) => {
+//   try {
+//     const { username, email, password, age, role, profile } = req.body;
 
-    // ✅ yêu cầu đúng với model mới: password thay cho passwordHash
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: 'username, email, password là bắt buộc' });
-    }
+//     // ✅ yêu cầu đúng với model mới: password thay cho passwordHash
+//     if (!username || !email || !password) {
+//       return res.status(400).json({ message: 'username, email, password là bắt buộc' });
+//     }
 
-    // create -> trigger pre('save') => tự hash password
-    const user = await User.create({ username, email, password, age, role, profile });
+//     // create -> trigger pre('save') => tự hash password
+//     const user = await User.create({ username, email, password, age, role, profile });
 
-    // không trả password về client
-    const { password: _pw, ...safe } = user.toObject();
-    res.status(201).json({ message: 'Created', data: safe });
-  } catch (err) {
-    sendMongooseError(err, res, next);
-  }
-});
+//     // không trả password về client
+//     const { password: _pw, ...safe } = user.toObject();
+//     res.status(201).json({ message: 'Created', data: safe });
+//   } catch (err) {
+//     sendMongooseError(err, res, next);
+//   }
+// });
 
 // READ ONE   -> GET /api/v1/users/:id
 router.get('/:id', async (req, res, next) => {
