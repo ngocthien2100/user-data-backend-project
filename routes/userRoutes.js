@@ -5,6 +5,8 @@ const User = require('../models/User');
 
 const router = express.Router();
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+const { protect, authorize } = require('../middleware/authMiddleware');
+
 
 // --- helper bắt lỗi Mongoose ---
 function sendMongooseError(err, res, next) {
@@ -23,7 +25,7 @@ function sendMongooseError(err, res, next) {
 }
 
 // READ ALL  -> GET /api/v1/users?page=&limit=&search=&role=
-router.get('/', async (req, res, next) => {
+router.get('/', protect, authorize('admin'), async (req, res, next) => {
   try {
     const page  = Math.max(parseInt(req.query.page || '1', 10), 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit || '10', 10), 1), 100);
@@ -70,9 +72,17 @@ router.get('/', async (req, res, next) => {
 //     sendMongooseError(err, res, next);
 //   }
 // });
-
+//-- Endpoint: Lấy thông tin cá nhân của user đang đăng nhập -> GET /api/v1/users/me
+router.get('/me', protect, async (req, res, next) => {
+ // Ghi chú: Middleware 'protect' đã tìm user và gán vào req.user
+ // Chúng ta chỉ cần trả về req.user
+ res.status(200).json({
+ message: "Lấy thông tin cá nhân thành công",
+ data: req.user 
+ });
+});
 // READ ONE   -> GET /api/v1/users/:id
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', protect, authorize('admin'), async (req, res, next) => {
   try {
     const { id } = req.params;
     if (!isValidObjectId(id)) return res.status(400).json({ message: 'id không hợp lệ' });
@@ -86,7 +96,7 @@ router.get('/:id', async (req, res, next) => {
 // UPDATE     -> PUT /api/v1/users/:id
 // Lab gợi ý ví dụ đổi profile.fullName
 // UPDATE  -> PUT /api/v1/users/:id
-router.put('/:id', async (req, res, next) => {
+router.put('/:id', protect, authorize('admin'), async (req, res, next) => {
   try {
     const { id } = req.params;
     if (!isValidObjectId(id)) return res.status(400).json({ message: 'id không hợp lệ' });
@@ -125,7 +135,7 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // DELETE     -> DELETE /api/v1/users/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', protect, authorize('admin'), async (req, res, next) => {
   try {
     const { id } = req.params;
     if (!isValidObjectId(id)) return res.status(400).json({ message: 'id không hợp lệ' });
