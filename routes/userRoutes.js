@@ -141,8 +141,10 @@ router.delete('/:id', protect, authorize('admin'), async (req, res, next) => {
     if (!isValidObjectId(id)) return res.status(400).json({ message: 'id không hợp lệ' });
 
     const deleted = await User.findByIdAndDelete(id);
+
     if (!deleted) return res.status(404).json({ message: `Không tìm thấy user id ${id}` });
     res.status(204).send();
+    
   } catch (err) { next(err); }
 });
 
