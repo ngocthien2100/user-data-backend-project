@@ -1,30 +1,57 @@
 // index.js
+const connectDB = require('./db'); // thêm dòng này ở đầu file
 
-//1. import thư viện Express
+require('dotenv').config();
 const express = require('express');
+const morgan = require('morgan');
+const cors = require('cors');
 
-//2. Khơi tạo ứng dụng Express
 const app = express();
-const PORT = 3000;//cổng ứng dụng chạy
+const PORT = process.env.PORT || 3000;
 
-//3. Xây dựng Route/Endpoint đầu tiên (API chào mừng)
-//Phương thức GET, đường dẫn /
+// Middleware chung
+app.use(cors());
+app.use(morgan('dev'));
+app.use(express.json());
+
+// Kết nối tới MongoDB
+connectDB();   
+
+// Routes
+const userRoutes = require('./routes/userRoutes.js');
+const authRoutes = require('./routes/authRoutes.js');
+const categoryRoutes = require('./routes/categoryRoutes');  // <-- THÊM DÒNG NÀY
+const productRoutes = require('./routes/productRoutes');   // <-- THÊM DÒNG NÀY
+const orderRoutes = require('./routes/orderRoutes');     // <-- THÊM DÒNG NÀY
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/categories', categoryRoutes);  // <-- THÊM DÒNG NÀY
+app.use('/api/v1/products', productRoutes);    // <-- THÊM DÒNG NÀY
+app.use('/api/v1/orders', orderRoutes);      // <-- THÊM DÒNG NÀY
+
+// Health check (gộp một route chính)
 app.get('/', (req, res) => {
-    //Trả về phản hồi JSON
-    res.json({ message: 'Chào mừng đến với API Dữ liệu người dùng' });
-});
-// API GET để kiểm tra trạng thái hoạt động của Server
-app.get('/api/v1/status', (req, res) => {
-    // Trả về một phản hồi JSON chứa thông tin trạng thái
-    res.json({ 
-        service: "User Data API", 
-        version: "1.0", 
-        health: "Good",
-        timestamp: new Date().toISOString() // Thêm thời gian hiện tại
-    });
+  res.status(200).json({
+    service: 'User Data API',
+    version: '1.0',
+    health: 'OK',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
 });
 
-//4. Lắng nghe các yêu cầu tại cổng định nghĩa
+// 404
+app.use((req, res) => {
+  res.status(404).json({ message: 'Route not found', path: req.originalUrl });
+});
+
+// Error handler
+app.use((err, req, res, _next) => {
+  console.error(err);
+  res.status(err.status || 500).json({ message: err.message || 'Internal Server Error' });
+});
+
+// Start server
 app.listen(PORT, () => {
-    console.log(`✅ Server đang chạy tại http://localhost:${PORT}`);
+  console.log(`✅ Server đang chạy tại http://localhost:${PORT}`);
 });
