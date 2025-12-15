@@ -21,12 +21,13 @@ connectDB();
 const userRoutes = require('./routes/userRoutes.js');
 const authRoutes = require('./routes/authRoutes.js');
 const categoryRoutes = require('./routes/categoryRoutes');  // <-- THÊM DÒNG NÀY
-const productRoutes  = require('./routes/productRoutes');   // <-- THÊM DÒNG NÀY
+const productRoutes = require('./routes/productRoutes');   // <-- THÊM DÒNG NÀY
+const orderRoutes = require('./routes/orderRoutes');     // <-- THÊM DÒNG NÀY
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/categories', categoryRoutes);  // <-- THÊM DÒNG NÀY
-app.use('/api/v1/products',  productRoutes);    // <-- THÊM DÒNG NÀY
-
+app.use('/api/v1/products', productRoutes);    // <-- THÊM DÒNG NÀY
+app.use('/api/v1/orders', orderRoutes);      // <-- THÊM DÒNG NÀY
 
 // Health check (gộp một route chính)
 app.get('/', (req, res) => {
