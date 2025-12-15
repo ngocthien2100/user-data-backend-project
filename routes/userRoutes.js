@@ -223,5 +223,32 @@ router.delete('/:id', protect, authorize('admin'), async (req, res, next) => {
     next(err);
   }
 });
+// upload avatar
+const { upload, uploadToCloudinary } = require('../utils/cloudinary');
+//POST /api/v1/users/me/avatar
+// upload.single('avatar'): 'avatar' là tên field trong form-data gửi lên
+router.post('/upload-avatar', protect, upload.single('avatar'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Vui lòng chọn file để tải lên' });
+    }
+
+    //1. Upload file lên Cloudinary
+    const result = await uploadToCloudinary(req.file.buffer);
+    
+    //2. Lưu URL vào trường profile.avatar của User
+    const user = await User.findById(req.user._id);
+    user.profile.avatarUrl = result.secure_url;
+
+    await user.save({ validateBeforeSave: false }); // Bỏ qua validate để tránh lỗi không cần thiết
+    
+    res.status(200).json({
+      message: 'Tải ảnh đại diện lên thành công',
+      avatarUrl: result.secure_url
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;

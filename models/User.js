@@ -36,6 +36,12 @@ const userSchema = new mongoose.Schema({
       default: '',
       trim: true
     },
+    // Avatar URL
+    avatarUrl:{
+      type: String,
+      default: '',
+      trim: true
+    }
   },
 
   email: {
