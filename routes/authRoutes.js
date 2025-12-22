@@ -3,6 +3,9 @@ const router = express.Router();
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const sendEmail = require('../utils/sendEmail');
+const crypto = require('crypto');
+
 
 // Ghi chu: Tao mot ham helpers de tao token JWT
 const generatoteToken = (id) => {
@@ -80,4 +83,68 @@ router.post('/login', async (req, res) => {
     }
 });
 
-module.exports = router;
+// 1. Quên mật khẩu - Gửi email đặt lại mật khẩu
+router.post('/forgot-password', async (req, res, next) => {
+ try {
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) {
+        res.status(404);
+        throw new Error('Không tìm thấy Email này trong hệ thống');
+    }
+ // Tạo token
+ const resetToken = user.getResetPasswordToken();
+ await user.save({ validateBeforeSave: false }); // Lưu lại token vào DB
+
+ // Tạo URL reset (Frontend sẽ dùng link này)
+ const resetUrl = `${req.protocol}://${req.get('host')}/api/v1/auth/reset-password/${resetToken}`;
+ const message = `Bạn vừa yêu cầu đổi mật khẩu. Hãy gửi request PUT đến link sau để đặt lại:\n\n${resetUrl}`;
+
+ try {
+    await sendEmail({
+        email: user.email,
+        subject: 'Token đổi mật khẩu (Hết hạn sau 10p)',
+        message
+    });
+ res.status(200).json({ success: true, message: 'Đã gửi email hướng dẫn!' });
+} catch (err) {
+    // Nếu gửi mail lỗi thì xóa token trong DB đi
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save({ validateBeforeSave: false });
+    return next(new Error('Không thể gửi email, vui lòng thử lại'));
+}
+} catch (err) {
+    next(err);
+}
+});
+// 2. ĐẶT LẠI MẬT KHẨU (Reset Password)
+router.put('/reset-password/:token', async (req, res, next) => {
+ try {
+ // Hash token từ URL để so sánh với token đã hash trong DB
+ const resetPasswordToken = crypto
+    .createHash('sha256')
+    .update(req.params.token) // Token lấy từ URL
+    .digest('hex');
+ // Tìm user có token đó VÀ chưa hết hạn ($gt: greater than now)
+ const user = await User.findOne({
+    resetPasswordToken,
+    resetPasswordExpire: { $gt: Date.now() }
+});
+ if (!user) {
+    res.status(400);
+    throw new Error('Token không hợp lệ hoặc đã hết hạn');
+}
+// Đặt lại mật khẩu mới
+user.password = req.body.password; //Hook pre 'save' trong model User sẽ tự động hash mật khẩu
+// Xóa token và thời gian hết hạn
+user.resetPasswordToken = undefined;
+user.resetPasswordExpire = undefined;
+
+await user.save(); // Lưu user với mật khẩu mới
+
+res.status(200).json({ success: true, message: 'Đổi mật khẩu thành công! Vui lòng đăng nhập lại.' });
+} catch (err) {
+    next(err);
+}
+});
+ module.exports = router;
