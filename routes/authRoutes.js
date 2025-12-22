@@ -6,145 +6,154 @@ const jwt = require('jsonwebtoken');
 const sendEmail = require('../utils/sendEmail');
 const crypto = require('crypto');
 
-
-// Ghi chu: Tao mot ham helpers de tao token JWT
-const generatoteToken = (id) => {
-    return jwt.sign({id}, process.env.JWT_SECRET, {
-        expiresIn: '30d'
-    });
+// Helper tạo JWT
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
 
-//-- 1. Endpoint: Tạo user mới (REGISTER) -> POST /api/v1/auth/register
+// REGISTER -> POST /api/v1/auth/register
 router.post('/register', async (req, res) => {
-    try {
-        const { username, email, password, profile, role } = req.body;
-        //1. Kiểm tra user đã tồn tại chưa
-        const userExists = await User.findOne({ email });
-        if(userExists){
-            return res.status(400).json({ message: 'User đã tồn tại với email này' });
-        }
-        //2. Tạo user mới
-        const newUser = await User.create({
-            username,
-            email,
-            password,
-            profile,
-            role
-        });
-        //3. Trả về thông tin user (trừ password) và cấp token ngay
-        if (newUser) {
-            res.status(201).json({
-                message:'Tạo User thành công',
-                data: {
-                    _id: newUser._id,
-                    username: newUser.username,
-                    email: newUser.email,
-                    profile: newUser.profile,
-                    role: newUser.role,
-                },
-                token: generatoteToken(newUser._id)
-            });
-        }
-    } catch (err){
-        res.status(400).json({message: "Tạo user thất bại", error: err.message});
+  try {
+    const { username, email, password, profile, role } = req.body;
+
+    // (Khuyến nghị) Không cho tự set role = admin từ register
+    // Nếu giảng viên yêu cầu vẫn cho set role thì bạn bỏ đoạn này
+    const safeRole = role && role === 'admin' ? 'user' : (role || 'user');
+
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: 'User đã tồn tại với email này' });
     }
+
+    const newUser = await User.create({
+      username,
+      email,
+      password,
+      profile,
+      role: safeRole,
+    });
+
+    return res.status(201).json({
+      message: 'Tạo User thành công',
+      data: {
+        _id: newUser._id,
+        username: newUser.username,
+        email: newUser.email,
+        profile: newUser.profile,
+        role: newUser.role,
+      },
+      token: generateToken(newUser._id),
+    });
+  } catch (err) {
+    return res.status(400).json({ message: 'Tạo user thất bại', error: err.message });
+  }
 });
 
-//-- 2. Endpoint: Đăng nhập (LOGIN) -> POST /api/v1/auth/login
+// LOGIN -> POST /api/v1/auth/login
 router.post('/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        //1. Tìm user theo email
-        const user = await User.findOne({ email }).select('+password');
+  try {
+    const { email, password } = req.body;
 
-        if(!user){
-            return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
-        }
-        //2. Kiểm tra mật khẩu
-        const isMatch = await bcrypt.compare(password, user.password);
-
-        if(!isMatch){
-            return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
-        }
-        //3. Trả về thông tin user (trừ password) và cấp token
-        res.status(200).json({
-            message: 'Đăng nhập thành công',
-            data: {
-                _id: user._id,
-                username: user.username,
-                email: user.email,
-                profile: user.profile,
-                role: user.role,
-            },
-            token: generatoteToken(user._id)
-        });
-    } catch (err){
-        res.status(500).json({message: "Lỗi Server", error: err.message});
+    const user = await User.findOne({ email }).select('+password');
+    if (!user) {
+      return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
     }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
+    }
+
+    return res.status(200).json({
+      message: 'Đăng nhập thành công',
+      data: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        profile: user.profile,
+        role: user.role,
+      },
+      token: generateToken(user._id),
+    });
+  } catch (err) {
+    return res.status(500).json({ message: 'Lỗi Server', error: err.message });
+  }
 });
 
-// 1. Quên mật khẩu - Gửi email đặt lại mật khẩu
+// FORGOT PASSWORD -> POST /api/v1/auth/forgot-password
 router.post('/forgot-password', async (req, res, next) => {
- try {
-    const user = await User.findOne({ email: req.body.email });
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
     if (!user) {
-        res.status(404);
-        throw new Error('Không tìm thấy Email này trong hệ thống');
+      res.status(404);
+      throw new Error('Không tìm thấy Email này trong hệ thống');
     }
- // Tạo token
- const resetToken = user.getResetPasswordToken();
- await user.save({ validateBeforeSave: false }); // Lưu lại token vào DB
 
- // Tạo URL reset (Frontend sẽ dùng link này)
- const resetUrl = `${req.protocol}://${req.get('host')}/api/v1/auth/reset-password/${resetToken}`;
- const message = `Bạn vừa yêu cầu đổi mật khẩu. Hãy gửi request PUT đến link sau để đặt lại:\n\n${resetUrl}`;
+    const resetToken = user.getResetPasswordToken();
+    await user.save({ validateBeforeSave: false });
 
- try {
-    await sendEmail({
+    const resetUrl = `${req.protocol}://${req.get('host')}/api/v1/auth/reset-password/${resetToken}`;
+    const message =
+      `Bạn vừa yêu cầu đổi mật khẩu.\n` +
+      `Hãy gửi request PUT đến link sau để đặt lại mật khẩu:\n\n${resetUrl}`;
+
+    try {
+      await sendEmail({
         email: user.email,
         subject: 'Token đổi mật khẩu (Hết hạn sau 10p)',
-        message
-    });
- res.status(200).json({ success: true, message: 'Đã gửi email hướng dẫn!' });
-} catch (err) {
-    // Nếu gửi mail lỗi thì xóa token trong DB đi
+        message,
+      });
+
+      return res.status(200).json({ success: true, message: 'Đã gửi email hướng dẫn!' });
+    } catch (err) {
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+      return next(new Error('Không thể gửi email, vui lòng thử lại'));
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+// RESET PASSWORD -> PUT /api/v1/auth/reset-password/:token
+router.put('/reset-password/:token', async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    if (!password) {
+      return res.status(400).json({ message: 'Thiếu password mới' });
+    }
+
+    const resetPasswordToken = crypto
+      .createHash('sha256')
+      .update(req.params.token)
+      .digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    }).select('+resetPasswordToken'); // optional
+
+    if (!user) {
+      res.status(400);
+      throw new Error('Token không hợp lệ hoặc đã hết hạn');
+    }
+
+    user.password = password; // pre('save') sẽ tự hash
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
-    await user.save({ validateBeforeSave: false });
-    return next(new Error('Không thể gửi email, vui lòng thử lại'));
-}
-} catch (err) {
-    next(err);
-}
-});
-// 2. ĐẶT LẠI MẬT KHẨU (Reset Password)
-router.put('/reset-password/:token', async (req, res, next) => {
- try {
- // Hash token từ URL để so sánh với token đã hash trong DB
- const resetPasswordToken = crypto
-    .createHash('sha256')
-    .update(req.params.token) // Token lấy từ URL
-    .digest('hex');
- // Tìm user có token đó VÀ chưa hết hạn ($gt: greater than now)
- const user = await User.findOne({
-    resetPasswordToken,
-    resetPasswordExpire: { $gt: Date.now() }
-});
- if (!user) {
-    res.status(400);
-    throw new Error('Token không hợp lệ hoặc đã hết hạn');
-}
-// Đặt lại mật khẩu mới
-user.password = req.body.password; //Hook pre 'save' trong model User sẽ tự động hash mật khẩu
-// Xóa token và thời gian hết hạn
-user.resetPasswordToken = undefined;
-user.resetPasswordExpire = undefined;
 
-await user.save(); // Lưu user với mật khẩu mới
+    await user.save();
 
-res.status(200).json({ success: true, message: 'Đổi mật khẩu thành công! Vui lòng đăng nhập lại.' });
-} catch (err) {
+    return res.status(200).json({
+      success: true,
+      message: 'Đổi mật khẩu thành công! Vui lòng đăng nhập lại.',
+    });
+  } catch (err) {
     next(err);
-}
+  }
 });
- module.exports = router;
+
+module.exports = router;

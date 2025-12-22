@@ -4,10 +4,10 @@ const sendEmail = async (options) => {
     // 1. Tạo transporter
     const transporter = nodemailer.createTransport({
         host: "sandbox.smtp.mailtrap.io",
-  port: 2525,
-  auth: {
-    user: "b0572c96509347",
-    pass: "****f223"
+        port: 2525,
+        auth: {
+            user: "b0572c96509347",
+            pass: "a90dbb692ff223"
   }
 });
 
